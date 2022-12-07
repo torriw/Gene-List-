@@ -1,0 +1,91 @@
+---
+title: "Untitled"
+output: html_document
+date: "2022-12-06"
+---
+
+```{r install packages}
+setwd("C:/Users/torriw/Desktop/leah")
+install.packages("dplyr")
+install.packages("devtools")
+BiocManager::install("biomaRt")
+library(biomaRt)
+```
+
+```{r using h19 to build }
+snp_txt<-read.delim("summary_stats.txt")
+#snp_txt_4<-snp_txt[snp_txt$neg_log_pvalue > 3.99,]
+snp_txt_3<-snp_txt[snp_txt$neg_log_pvalue > 3,]
+#snp_list_full<-snp_txt_4$rsid
+snp_list_3<-snp_txt_3$rsid
+
+
+#Mart used to map SNPs to Ensembl Gene IDs
+grch37.snp = useMart(biomart="ENSEMBL_MART_SNP", host="grch37.ensembl.org", path="/biomart/martservice",dataset="hsapiens_snp")
+
+#Mart used to map Ensembl Gene IDs to Gene name
+grch37 = useMart(biomart="ENSEMBL_MART_ENSEMBL", host="grch37.ensembl.org", path="/biomart/martservice", dataset="hsapiens_gene_ensembl")
+
+```
+
+```{r Mapping SNPs to Ensembl Gene IDs}
+table1 <- getBM(attributes = c("refsnp_id", "ensembl_gene_stable_id"), 
+                      filters = "snp_filter", 
+                      values = snp_list_3 , 
+                      mart = grch37.snp)
+```
+
+```{r Mapping Ensembl Gene IDs to Gene names }
+# "ensembl_gene_id", "external_gene_name","external_gene_source","variation_name","start_position","end_position","description"
+
+# find info on specific genes (BHMT2, MTHFD1L) for value portion of code to quicker the process 
+
+table2 <- getBM(attributes = c("ensembl_gene_id","external_gene_name"),
+                 filters = "ensembl_gene_id", 
+                 values =  table1$ensembl_gene_stable_id, 
+                 mart = grch37)
+write.csv(table2,"C:/Users/torriw/Desktop/leah/dagene_list3.csv",row.names = F)
+```
+
+```{r check for choline genes }
+# Choline genes of interest
+# MTHFR CHDH CEPT1 PEMT BHMT CHKA CHKAB CHPT PCYTIA PCYTIB DHFR MTHFD1 
+
+###if there's a larger list and you don't want to check one by one###
+# genelist<-c("MTHFR","CHDH", "CEPT1", "PEMT", "BHMT2", "CHKA", "CHKAB", "CHPT", "PCYTIA", "PCYTIB", "DHFR", "MTHFD1L" )
+# > genelist %in% table2$external_gene_name
+#  [1] FALSE FALSE FALSE FALSE  TRUE FALSE FALSE FALSE FALSE FALSE FALSE  TRUE
+
+genecheck<-table2$external_gene_name == "MTHFD1L"
+for (i in genecheck) {
+  if (i == "TRUE"){
+     print(i)
+  }
+}
+
+# if nothing prints then the gene is not in the list
+```
+
+```{r find snps and pvalues from matching genes }
+# find gene id 
+table2[table2$external_gene_name == "BHMT2",] # ENSG00000132840
+table2[table2$external_gene_name == "MTHFD1L",] # ENSG00000120254
+
+# find snp from gene id
+table1[table1$ensembl_gene_stable_id == "ENSG00000132840",] # rs671960
+table1[table1$ensembl_gene_stable_id == "ENSG00000120254",] # rs742830,rs2096066,rs3734418,rs6933598,rs9767752,rs11155761
+
+#find pvalues of snps
+snp_txt[snp_txt$rsid == "rs671960",]
+
+snplist<- c("rs742830","rs2096066","rs3734418","rs6933598","rs9767752","rs11155761")
+for (i in snplist){
+  for (j in snp_txt$rsid){
+    if (i %in% j){
+      pvals<-(snp_txt[snp_txt$rsid == i,])
+      pvals<-list(pvals)
+      print(pvals)
+    }
+  }
+}
+```
